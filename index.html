@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard FRUVER</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+
+<style>
+body{
+    font-family:Arial;
+    background:#f4f6f9;
+    margin:20px;
+}
+h1{text-align:center}
+.grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:20px;
+    margin-bottom:20px;
+}
+.card{
+    background:white;
+    padding:20px;
+    border-radius:8px;
+    text-align:center;
+    box-shadow:0 2px 6px rgba(0,0,0,0.1);
+}
+.value{
+    font-size:24px;
+    font-weight:bold;
+}
+canvas{
+    background:white;
+    padding:10px;
+    border-radius:8px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>📊 Dashboard FRUVER</h1>
+
+<div class="grid">
+<div class="card"><div>Total Enviado</div><div id="kpi1" class="value">-</div></div>
+<div class="card"><div>Total Devuelto</div><div id="kpi2" class="value">-</div></div>
+<div class="card"><div>Saldo</div><div id="kpi3" class="value">-</div></div>
+</div>
+
+<canvas id="chart"></canvas>
+
+<script>
+
+const url="https://docs.google.com/spreadsheets/d/e/2PACX-1vRKDt3OhqiTwY3aJ-TYfP1-HcXCb6EPSn4xJHl02UqapMUGXZKWQU0fXpzB22E_nA/pub?gid=1273729648&single=true&output=csv";
+
+// ===== Funciones robustas =====
+const clean=t=>t?.toString().trim().replace(/\s+/g," ");
+const toNum=v=>{
+    if(!v) return 0;
+    return parseFloat(v.toString().replace(",","."));
+}
+
+// ===== Parse CSV =====
+Papa.parse(url,{
+    download:true,
+    header:true,
+    skipEmptyLines:true,
+
+    complete:function(results){
+
+        console.log("HEADERS:", results.meta.fields);
+        console.log("RAW DATA:", results.data);
+
+        // normalizar columnas
+        const data = results.data.map(r=>{
+            const n={}
+            Object.keys(r).forEach(k=>n[clean(k)]=r[k])
+            return n
+        }).filter(x=>x["Tienda"]);
+
+        console.log("CLEAN DATA:", data);
+
+        // detectar nombres reales
+        const headers = Object.keys(data[0]||{});
+        console.log("DETECTED:", headers);
+
+        // obtener columnas (match flexible)
+        const col = name=>headers.find(h=>h.toLowerCase().includes(name));
+
+        const cTienda = col("tienda");
+        const cEnv = col("enviado");
+        const cDev = col("devuelto");
+        const cSaldo = col("saldo");
+
+        console.log("COL MAP:",cTienda,cEnv,cDev,cSaldo);
+
+        const tiendas=data.map(x=>x[cTienda]);
+        const enviado=data.map(x=>toNum(x[cEnv]));
+        const devuelto=data.map(x=>toNum(x[cDev]));
+        const saldo=data.map(x=>toNum(x[cSaldo]));
+
+        const sum=a=>a.reduce((a,b)=>a+b,0);
+
+        document.getElementById("kpi1").innerHTML=sum(enviado).toLocaleString();
+        document.getElementById("kpi2").innerHTML=sum(devuelto).toLocaleString();
+        document.getElementById("kpi3").innerHTML=sum(saldo).toLocaleString();
+
+        new Chart(document.getElementById("chart"),{
+            type:"bar",
+            data:{
+                labels:tiendas,
+                datasets:[{
+                    label:"Saldo",
+                    data:saldo
+                }]
+            }
+        });
+
+    }
+});
+
+</script>
+
+</body>
+</html>
